@@ -170,7 +170,9 @@ def portmanteau(x, y, verbose=False):
   if verbose:
     for s in solutions:
       print s, score(x,y,s, verbose=verbose)
-  return max(solutions, key=lambda s: score(x,y,s, verbose=verbose))
+  return (max(solutions, key=lambda s: score(x,y,s, verbose=verbose))
+          if solutions
+          else None)
 
 
 def main():
@@ -181,7 +183,8 @@ def main():
   (options,args) = parser.parse_args()
 
   if len(args) == 2:
-    print portmanteau(args[0], args[1], verbose=options.verbose)
+    print (portmanteau(args[0], args[1], verbose=options.verbose)
+           or 'does not make a good portmanteau')
 
   # test barrage
   else:
@@ -209,10 +212,7 @@ def main():
       ('sex', 'expert'),
     ]
     for x, y in tests:
-      try:
-        port = portmanteau(x, y)
-      except ValueError:
-        port = 'does not make a good portmanteau'
+      port = portmanteau(x, y) or 'does not make a good portmanteau'
       print '%s + %s: %s' % (x, y, port)
 
 
