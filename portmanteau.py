@@ -1,6 +1,8 @@
 import json
 from optparse import OptionParser
+import os
 import sys
+from urllib import urlencode
 import urllib2
 
 
@@ -11,6 +13,30 @@ def is_vowel(c):
 
 def is_consonant(c):
   return not is_vowel(c)
+
+
+HYPHENATION_API = 'http://api.wordnik.com:80/v4/word.json/%s/hyphenation'
+
+def get_syllables(word):
+  path = os.path.join('syllables', word + '.json')
+
+  # If previously stored, read from file
+  if os.path.exists(path):
+    return json.loads(open(path, 'r').read())
+
+  # Otherwise, query wordnik & save
+  params = {
+    'includeSuggestions': False,
+    'api_key': '8d5d75f1783f5fa34407903328500b23d3357b2539f64eb9e',
+    'useCanonical': False,
+    'limit': 50,
+  }
+  url = '%s?%s' % (HYPHENATION_API % word, urlencode(params))
+  data = urllib2.urlopen(url).read()
+  f = open(path, 'w')
+  f.write(data)
+  f.close()
+  return json.loads(data)
 
 
 def indices(s, substr):
@@ -141,6 +167,36 @@ def join_on_substr(x, y, substr):
   return solutions
 
 
+def concat_syllables(syllables):
+  '''Return the string join of a list of syllables'''
+  return ''.join(syllable['text'] for syllable in syllables)
+
+
+def is_stressed(syllable):
+  return 'stress' in syllable.get('type', '')
+
+
+def syllable_join(x, y):
+  '''
+  Return solutions for joining on syllables.
+  '''
+  x_syllables = get_syllables(x)
+  y_syllables = get_syllables(y)
+  if not x_syllables or not y_syllables:
+    return []
+
+  solutions = set()
+  for i, x_syl in enumerate(x_syllables):
+    for j, y_syl in enumerate(y_syllables):
+      # Add if stresses alternate at the join point.
+      if is_stressed(x_syl) != is_stressed(y_syl):
+        # Also make sure we don't have consecutive vowels. Consonants ok.
+        if is_consonant(x_syl['text'][-1]) or is_consonant(y_syl['text'][0]):
+          solutions.add(concat_syllables(x_syllables[:i+1] + y_syllables[j:]))
+
+  return solutions
+
+
 def portmanteau(x, y, verbose=False):
   x = x.lower()
   y = y.lower()
@@ -185,6 +241,7 @@ def main():
   if len(args) == 2:
     print (portmanteau(args[0], args[1], verbose=options.verbose)
            or 'does not make a good portmanteau')
+    print syllable_join(args[0], args[1])
 
   # test barrage
   else:
