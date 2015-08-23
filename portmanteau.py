@@ -16,9 +16,13 @@ def is_consonant(c):
 
 
 HYPHENATION_API = 'http://api.wordnik.com:80/v4/word.json/%s/hyphenation'
+SYLLABLES_PATH = 'syllables'
 
 def get_syllables(word):
-  path = os.path.join('syllables', word + '.json')
+  path = os.path.join(SYLLABLES_PATH, word + '.json')
+
+  if not os.path.exists(SYLLABLES_PATH):
+    os.makedirs(SYLLABLES_PATH)
 
   # If previously stored, read from file
   if os.path.exists(path):
@@ -112,13 +116,14 @@ def score(x, y, port, verbose=False):
   # TODO: ML this instead of jankily guessing weights yourself
   score = 0
   for word in [x, y]:
-    # longest substring length up to 7
+    # longest substring length up to half
     ss_len = len(first(lcs(word, port), default=''))
     score += min(ss_len, 7)
 
-  # penalize length > 12
-  if len(port) > 12:
-    score -= (len(port) - 12)
+  # penalize extra long words
+  long_len = max(int(len(x + y) * 0.7), 10)
+  if len(port) > long_len:
+    score -= (len(port) - long_len)
 
   # at least substr n>=3 represented from both
   if all(len(first(lcs(w, port), default='')) >= 3 for w in [x,y]):
@@ -180,16 +185,18 @@ def syllable_join(x, y):
   '''
   Return solutions for joining on syllables.
   '''
+  solutions = set()
+
   x_syllables = get_syllables(x)
   y_syllables = get_syllables(y)
   if not x_syllables or not y_syllables:
-    return []
+    return solutions
 
-  solutions = set()
   for i, x_syl in enumerate(x_syllables):
     for j, y_syl in enumerate(y_syllables):
       # Add if stresses alternate at the join point.
       if is_stressed(x_syl) != is_stressed(y_syl):
+      #if not is_stressed(x_syl) and is_stressed(y_syl):
         # Also make sure we don't have consecutive vowels. Consonants ok.
         if is_consonant(x_syl['text'][-1]) or is_consonant(y_syl['text'][0]):
           solutions.add(concat_syllables(x_syllables[:i+1] + y_syllables[j:]))
@@ -207,18 +214,17 @@ def portmanteau(x, y, verbose=False):
   substrs = list(lcs(x, y))
   # Remove standalone vowels
   substrs = [s for s in substrs if is_consonant(s)]
-  #print 'substrings', substrs
   for substr in substrs:
     solutions.update(join_on_substr(x, y, substr))
 
-  # Try joining along syllables near ends
+  # Try joining near ends
   solutions.add(join_near(x, y))
   solutions.add(join_near(x, y, join_on_vowel=False))
   solutions.add(join_near(y, x))
   solutions.add(join_near(y, x, join_on_vowel=False))
 
-  # TODO: this would be a lot better if we knew about syllable boundaries,
-  # but detecting them is actually a phd thesis
+  # Try joining on syllables
+  solutions.update(syllable_join(x, y))
 
   # Clean & print best
   solutions.discard(None)
@@ -241,7 +247,6 @@ def main():
   if len(args) == 2:
     print (portmanteau(args[0], args[1], verbose=options.verbose)
            or 'does not make a good portmanteau')
-    print syllable_join(args[0], args[1])
 
   # test barrage
   else:
@@ -267,6 +272,9 @@ def main():
       ('cocacola', 'colonization'),
       ('motor', 'cavalcade'),
       ('sex', 'expert'),
+      ('jackrabbit', 'antelope'),
+      ('pensive', 'sieve'),
+      ('shark', 'tornado'),
     ]
     for x, y in tests:
       port = portmanteau(x, y) or 'does not make a good portmanteau'
