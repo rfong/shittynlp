@@ -11,85 +11,90 @@ def get_lexicon():
 class Trie():
   _trie = {}
 
+  def path_exists(self, path):
+    """Check if `path` in trie"""
+    current_dict = self._trie
+    for letter in path:
+      if letter in current_dict:
+        current_dict = current_dict[letter]
+      else:
+        return False
+    else:
+      if _end in current_dict:
+        return True
+      else:
+        return False
+
+  def get_paths(self, trie=None):
+    """Run _get_paths() on a subtrie, or on the full trie by default."""
+    if trie is None:
+      trie = self._trie
+    return self._get_paths(trie)
+
+  @classmethod
+  def _get_paths(cls, trie):
+    """Return a list of all strings enumerated by a trie's paths."""
+    strings = []
+    for letter in trie:
+      if letter == _end or isinstance(trie[letter], str):
+        strings.append('')
+      else:
+        strings += [letter + leaf for leaf in cls._get_paths(trie[letter])]
+    return strings
+
+  def get_leaves(self, trie=None):
+    """Run _get_leaves() on a subtrie, or on the full trie by default."""
+    if trie is None:
+      trie = self._trie
+    return self._get_leaves(trie)
+ 
+  @classmethod
+  def _get_leaves(cls, trie):
+    """Given a trie, get all values keyed to _END."""
+    leaves = []
+    for letter in trie:
+      if letter == _end:
+        leaves += trie[_end]
+      else:
+        leaves += cls._get_leaves(trie[letter])
+    return leaves
+
 
 class PrefixTrie(Trie):
+
   def __init__(self, words):
-    self._trie = make_prefix_trie(words)
+    self._trie = dict()
+    for word in words:
+      current_dict = self._trie
+      for letter in word:
+        current_dict = current_dict.setdefault(letter, {})
+      current_dict[_end] = _end
 
 
 class SubstringTrie(Trie):
+
   def __init__(self, words):
-    self._trie = make_substring_trie(words)
+    """
+    This fucker needs to know about the substring's original words, so instead
+    of _END: _END let's put _END: [original word]
+    """
+    self._trie = dict()
+    for word in words:
+      for start in range(0, len(word)-1):
+        current_dict = self._trie
+        for letter in word[start:]:
+          current_dict = current_dict.setdefault(letter, {})
+        # This is ~5x faster than the concise non-in-place alternative
+        if not current_dict.get(_end):
+          current_dict[_end] = []
+        current_dict[_end].append(word)
 
-
-def make_prefix_trie(words):
-  root = dict()
-  for word in words:
-    current_dict = root
-    for letter in word:
-      current_dict = current_dict.setdefault(letter, {})
-    current_dict[_end] = _end
-  return root
-
-
-def make_substring_trie(words):
-  """
-  This fucker needs to know about the substring's original words, so instead
-  of _END: _END let's put _END: [original word]
-  """
-  root = dict()
-  for word in words:
-    for start in range(0, len(word)-1):
-      current_dict = root
-      for letter in word[start:]:
-        current_dict = current_dict.setdefault(letter, {})
-      current_dict[_end] = current_dict.get(_end, []) + [word]
-  return root
-
-
-def in_trie(trie, word):
-  """Check if `word` in `trie`"""
-  current_dict = trie
-  for letter in word:
-    if letter in current_dict:
-      current_dict = current_dict[letter]
-    else:
-      return False
-  else:
-    if _end in current_dict:
-      return True
-    else:
-      return False
-
-
-def get_trie_paths(trie):
-  """Given a trie, return a list of all strings enumerated by its paths."""
-  strings = []
-  for letter in trie:
-    if letter == _end or isinstance(trie[letter], str):
-      strings.append('')
-    else:
-      strings += [letter + leaf for leaf in get_trie_paths(trie[letter])]
-  return strings
-
-
-def get_trie_leaves(trie):
-  """Get all values keyed to _END in a trie."""
-  leaves = []
-  for letter in trie:
-    if letter == _end:
-      leaves.append(trie[_end])
-    else:
-      leaves += get_trie_leaves(trie[letter])
-  return leaves
-
-
-def get_words_with_substring(substring_trie, substring):
-  """Given a substring trie, return strings that contain `substring`"""
-  curr = substring_trie
-  for letter in substring:
-    curr = curr.get(letter, {})
-  return get_trie_leaves(curr)
+  def get_words_with_substring(self, substring):
+    """Return words that contain `substring`"""
+    curr = self._trie
+    for letter in substring:
+      curr = curr.get(letter, {})
+    return self.get_leaves(curr)
 
 
 def counter_avg(counter):
@@ -101,10 +106,13 @@ def counter_avg(counter):
           sum(counter.values()))
 
 
-def most_common(counter, n, reverse=True, min_count=2):
+def most_common(counter, n, least=False, min_count=2):
   """Return the N most/least common keys in counter"""
-  common = sorted(counter, key=counter.get, reverse=(not reverse))
-  return filter(lambda value: counter[value] >= min_count, common)[:n]
+  common = sorted(counter, key=counter.get, reverse=True)  # descending
+  common = filter(lambda value: counter[value] >= min_count, common)
+  if least:
+    return common[-n:]
+  return common[:n]
 
 
 def main():
@@ -115,14 +123,14 @@ def main():
   print 'avg word length: %d' % counter_avg(Counter(len(w) for w in lexicon))
 
   start = time.time()
-  prefix_trie = make_prefix_trie(lexicon)
+  prefix_trie = PrefixTrie(lexicon)
   print '%0.2f sec to make prefix trie, %d paths' % (
-    time.time() - start, len(get_trie_paths(prefix_trie)))
+    time.time() - start, len(prefix_trie.get_paths()))
 
   start = time.time()
-  substring_trie = make_substring_trie(lexicon)
+  substring_trie = SubstringTrie(lexicon)
   print '%0.2f sec to make substring trie, %d paths' % (
-    time.time() - start, len(get_trie_paths(substring_trie)))
+    time.time() - start, len(substring_trie.get_paths()))
 
   MIN_SUBSTR_LEN = 3
   substrings = []
@@ -136,11 +144,13 @@ def main():
   substring_len_counts = Counter([len(w) for w in substring_counts.keys()])
 
   most_common_substrs = most_common(substring_counts, 1000)
-  least_common_substrs = most_common(substring_counts, 1000, reverse=True)
+  least_common_substrs = most_common(substring_counts, 1000, least=True)
+  print most_common_substrs[:10]
   print least_common_substrs[:10]
 
-  print substring_trie['a']['a']['r']
-  print get_words_with_substring(substring_trie, 'aar')
+  #print substring_trie['a']['a']['r']
+  print substring_trie.get_words_with_substring('aar')
+  print substring_trie.get_words_with_substring('ati')[:100]
 
 
 #  import pandas
