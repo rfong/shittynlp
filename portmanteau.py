@@ -7,7 +7,7 @@ from words import is_consonant
 
 
 def get_syllables(word):
-  return words.get_syllables(word, 'syllables')
+  return words.get_syllables(word, dir='syllables')
 
 
 def indices(s, substr):
