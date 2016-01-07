@@ -1,3 +1,8 @@
+portmanteaux
+=====
+
+take two words and make a portmanteau out of them
+
 todo
 -----
 + deduplicate on stems
