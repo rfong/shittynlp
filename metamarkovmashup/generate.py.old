@@ -1,0 +1,29 @@
+#!/usr/bin/env python -tt
+
+import pickle
+import random
+import sys
+
+chain = pickle.load(open(sys.argv[1], "rb"))
+
+new_review = []
+token1 = "BEGIN"
+token2 = "NOW"
+
+while True:
+  try:
+    next_token = random.choice(chain[(token1, token2)])
+  except KeyError:
+    # no (token1, token2) match so just pick (<random token>, token2)
+    try:
+      next_token = random.choice(
+        filter(lambda bigram: bigram[1] == token2, chain.keys()))
+    except IndexError:
+      print "err errt:", token1, token2
+      break
+  token1, token2 = token2, next_token
+  if token2 == "END":
+    break
+  new_review.append(token2)
+
+print ' '.join(new_review)
