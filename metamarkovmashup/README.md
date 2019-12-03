@@ -4,6 +4,8 @@ messy collection of scripts via which I generated content for [@bookofdatura](ht
 
 right now these are just normal markov mashup scripts; the "meta" part will occur if I ever make this into a web app that automates the mashing up better than manually running a script
 
+EDIT: I made the webapp during SF Stupid Hackathon 2016. [metamarkovmashup.herokuapp.com](http://metamarkovmashup.herokuapp.com/)
+
 usage
 -----
 for now you probably want to run ./mmm2.sh on two plaintext corpora
